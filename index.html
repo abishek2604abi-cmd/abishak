@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chennai Transit Live ETA Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:    #05080f;
+    --bg-mid:     #0b1120;
+    --glass-bg:   rgba(255,255,255,0.045);
+    --glass-border: rgba(255,255,255,0.10);
+    --glass-shine: rgba(255,255,255,0.06);
+    --accent-blue:  #3b8bff;
+    --accent-cyan:  #00d4ff;
+    --accent-amber: #ffb340;
+    --accent-red:   #ff4f6a;
+    --accent-green: #2fffb4;
+    --text-primary: #e8eeff;
+    --text-muted:   #6878a0;
+    --text-dim:     #3a4560;
+    --orb1: #1a3aff;
+    --orb2: #00c5ff;
+    --orb3: #8b00ff;
+    --font-display: 'Syne', sans-serif;
+    --font-mono:    'DM Mono', monospace;
+    --font-body:    'Outfit', sans-serif;
+    --radius-card:  24px;
+    --radius-sm:    12px;
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    overflow-x: hidden;
+  }
+
+  /* ── Animated Background ── */
+  .bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 20% 30%, #0d1d4a 0%, transparent 55%),
+                radial-gradient(ellipse at 80% 70%, #0a1a35 0%, transparent 55%),
+                linear-gradient(160deg, #05080f 0%, #080d1e 40%, #060a18 100%);
+  }
+
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.18;
+    animation: orbFloat 12s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 { width: 420px; height: 420px; background: var(--orb1); top: -120px; left: -80px; animation-duration: 14s; }
+  .orb-2 { width: 300px; height: 300px; background: var(--orb2); top: 40%; right: -60px; animation-duration: 10s; animation-delay: -4s; opacity: 0.13; }
+  .orb-3 { width: 260px; height: 260px; background: var(--orb3); bottom: -80px; left: 30%; animation-duration: 16s; animation-delay: -7s; opacity: 0.10; }
+
+  @keyframes orbFloat {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px, 40px) scale(1.08); }
+  }
+
+  /* Grid noise overlay */
+  .bg-canvas::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.013'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* ── Layout ── */
+  .app {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px 40px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(59,139,255,0.10);
+    border: 1px solid rgba(59,139,255,0.25);
+    border-radius: 999px;
+    padding: 4px 14px 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .pulse-live {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 0 0 rgba(47,255,180,0.7);
+    animation: livePulse 1.4s ease-out infinite;
+  }
+  @keyframes livePulse {
+    0%  { box-shadow: 0 0 0 0 rgba(47,255,180,0.7); }
+    70% { box-shadow: 0 0 0 7px rgba(47,255,180,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(47,255,180,0); }
+  }
+  .header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 5vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(120deg, #e8eeff 30%, #3b8bff 70%, #00d4ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.15;
+  }
+  .header p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Main Card ── */
+  .card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-card);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow:
+      0 0 0 0.5px rgba(255,255,255,0.04) inset,
+      0 30px 80px rgba(0,0,0,0.55),
+      0 0 60px rgba(59,139,255,0.07);
+    padding: 26px 22px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), rgba(0,212,255,0.2), rgba(255,255,255,0.15), transparent);
+  }
+  .card::after {
+    content: '';
+    position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 100px;
+    background: radial-gradient(ellipse, rgba(59,139,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Mode Toggle ── */
+  .mode-toggle {
+    display: flex;
+    background: rgba(0,0,0,0.30);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 3px;
+    margin-bottom: 22px;
+  }
+  .mode-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.28s cubic-bezier(0.4,0,0.2,1);
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .mode-btn.active {
+    background: linear-gradient(135deg, #1a3cff 0%, #0099ff 100%);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(59,139,255,0.35), 0 0 0 0.5px rgba(255,255,255,0.12) inset;
+  }
+  .mode-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  /* ── Route Select ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .route-select-wrap { position: relative; margin-bottom: 20px; }
+  .route-select-wrap svg.chevron {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--text-muted); pointer-events: none;
+  }
+  select.route-select {
+    width: 100%;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 13px 40px 13px 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  select.route-select:focus {
+    border-color: rgba(59,139,255,0.5);
+    box-shadow: 0 0 0 3px rgba(59,139,255,0.12);
+  }
+  select.route-select option { background: #0d1525; }
+
+  /* ── Status Row ── */
+  .status-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px;
+    gap: 12px;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    letter-spacing: 0.03em;
+    border: 1px solid transparent;
+    transition: all 0.4s ease;
+  }
+  .status-pill.on-time {
+    background: rgba(47,255,180,0.08);
+    border-color: rgba(47,255,180,0.25);
+    color: var(--accent-green);
+  }
+  .status-pill.delayed {
+    background: rgba(255,179,64,0.08);
+    border-color: rgba(255,179,64,0.25);
+    color: var(--accent-amber);
+  }
+  .status-pill.heavy {
+    background: rgba(255,79,106,0.08);
+    border-color: rgba(255,79,106,0.28);
+    color: var(--accent-red);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    transition: background 0.4s;
+  }
+  .on-time  .status-dot { background: var(--accent-green); animation: livePulse 1.4s infinite; }
+  .delayed  .status-dot { background: var(--accent-amber); animation: livePulse 1.4s infinite; }
+  .heavy    .status-dot { background: var(--accent-red);   animation: livePulse 1.4s infinite; }
+
+  .refresh-btn {
+    background: rgba(59,139,255,0.10);
+    border: 1px solid rgba(59,139,255,0.22);
+    color: var(--accent-cyan);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+  .refresh-btn:hover { background: rgba(59,139,255,0.18); box-shadow: 0 0 16px rgba(59,139,255,0.2); }
+  .refresh-btn svg { width: 14px; height: 14px; transition: transform 0.0s; }
+  .refresh-btn.spinning svg { animation: spin360 0.6s cubic-bezier(0.4,0,0.2,1); }
+  @keyframes spin360 { to { transform: rotate(360deg); } }
+
+  /* ── ETA Display ── */
+  .eta-block {
+    text-align: center;
+    padding: 22px 0 18px;
+    position: relative;
+  }
+  .eta-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .eta-value {
+    font-family: var(--font-mono);
+    font-size: clamp(44px, 12vw, 64px);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -2px;
+    background: linear-gradient(120deg, #ffffff 0%, #a8c4ff 50%, #00d4ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: all 0.5s ease;
+    position: relative;
+  }
+  .eta-value.bump {
+    animation: etaBump 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes etaBump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  .eta-unit {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+  }
+  .eta-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-weight: 300;
+    min-height: 18px;
+    transition: all 0.4s ease;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+    margin: 18px 0;
+  }
+
+  /* ── Progress Track ── */
+  .track-section { margin-bottom: 22px; }
+  .track-stops {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    margin-top: 10px;
+  }
+  .track-line-wrap {
+    position: absolute;
+    top: 12px; left: 24px; right: 24px;
+    height: 3px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    overflow: visible;
+  }
+  .track-line-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 999px;
+    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+  .track-vehicle {
+    position: absolute;
+    right: -8px; top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.20), 0 0 16px rgba(0,212,255,0.6);
+    animation: vehicleGlow 1.8s ease-in-out infinite alternate;
+  }
+  @keyframes vehicleGlow {
+    from { box-shadow: 0 0 0 3px rgba(0,212,255,0.20), 0 0 12px rgba(0,212,255,0.5); }
+    to   { box-shadow: 0 0 0 5px rgba(0,212,255,0.10), 0 0 24px rgba(0,212,255,0.8); }
+  }
+
+  .stop {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+  .stop-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    background: var(--bg-mid);
+    transition: all 0.4s;
+    flex-shrink: 0;
+    margin-top: 7px;
+  }
+  .stop.passed .stop-dot { background: var(--accent-blue); border-color: var(--accent-cyan); }
+  .stop.current .stop-dot { background: var(--accent-cyan); border-color: #fff; box-shadow: 0 0 10px var(--accent-cyan); }
+  .stop-name {
+    font-size: 9.5px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+    text-align: center;
+    transition: color 0.4s;
+    line-height: 1.3;
+    max-width: 58px;
+    word-break: break-word;
+  }
+  .stop.passed .stop-name { color: var(--accent-blue); }
+  .stop.current .stop-name { color: var(--accent-cyan); font-weight: 500; }
+
+  /* ── Traffic Conditions ── */
+  .traffic-section { margin-bottom: 4px; }
+  .traffic-btns {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .traffic-btn {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.25);
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .traffic-btn .t-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+
+  .traffic-btn.active-smooth {
+    background: rgba(47,255,180,0.10);
+    border-color: rgba(47,255,180,0.35);
+    color: var(--accent-green);
+    box-shadow: 0 0 18px rgba(47,255,180,0.10);
+  }
+  .traffic-btn.active-moderate {
+    background: rgba(255,179,64,0.10);
+    border-color: rgba(255,179,64,0.35);
+    color: var(--accent-amber);
+    box-shadow: 0 0 18px rgba(255,179,64,0.10);
+  }
+  .traffic-btn.active-heavy {
+    background: rgba(255,79,106,0.10);
+    border-color: rgba(255,79,106,0.35);
+    color: var(--accent-red);
+    box-shadow: 0 0 18px rgba(255,79,106,0.10);
+  }
+  .traffic-btn:hover:not(.active-smooth):not(.active-moderate):not(.active-heavy) {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-primary);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+  .footer span { color: rgba(59,139,255,0.5); }
+
+  /* ── Responsive ── */
+  @media (max-width: 360px) {
+    .card { padding: 20px 16px 22px; }
+    .stop-name { font-size: 8.5px; max-width: 48px; }
+    .traffic-btn { font-size: 10.5px; }
+  }
+  @media (min-width: 640px) {
+    .app { padding: 40px 24px 60px; }
+    .card { padding: 32px 30px 34px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-canvas"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<div class="app">
+
+  <div class="header">
+    <div class="header-badge">
+      <span class="pulse-live"></span>
+      Live Tracking · Chennai
+    </div>
+    <h1>Transit ETA Tracker</h1>
+    <p>Real-time arrivals for MTC Bus &amp; Rail Network</p>
+  </div>
+
+  <div class="card">
+
+    <!-- Mode Toggle -->
+    <div class="mode-toggle" role="tablist">
+      <button class="mode-btn active" id="btn-bus" role="tab" onclick="setMode('bus')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="3"/>
+          <path d="M2 11h20M6 18v2M18 18v2"/>
+          <circle cx="7" cy="16" r="1" fill="currentColor"/><circle cx="17" cy="16" r="1" fill="currentColor"/>
+        </svg>
+        MTC Bus
+      </button>
+      <button class="mode-btn" id="btn-train" role="tab" onclick="setMode('train')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="14" rx="3"/>
+          <path d="M4 10h16M8 19l-2 2M16 19l2 2M8 19h8"/>
+          <circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/>
+        </svg>
+        Train / Metro
+      </button>
+    </div>
+
+    <!-- Route Select -->
+    <div class="section-label">Select Route</div>
+    <div class="route-select-wrap">
+      <select class="route-select" id="routeSelect" onchange="onRouteChange()">
+        <option value="0">21G — Broadway → Tambaram</option>
+        <option value="1">5C — Broadway → K.K. Nagar</option>
+        <option value="2">M70 — CMBT → Sholinganallur</option>
+        <option value="3">11B — Central → Guindy</option>
+        <option value="4">47A — T. Nagar → Perambur</option>
+      </select>
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+
+    <!-- Status Row -->
+    <div class="status-row">
+      <div class="status-pill on-time" id="statusPill">
+        <span class="status-dot"></span>
+        <span id="statusText">On Time</span>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="doRefresh()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Live Refresh
+      </button>
+    </div>
+
+    <!-- ETA Display -->
+    <div class="eta-block">
+      <div class="eta-label">Estimated Arrival</div>
+      <div class="eta-value" id="etaValue">08:42</div>
+      <div class="eta-unit">minutes away</div>
+      <div class="eta-sub" id="etaSub">Next stop: Central Station</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Progress Track -->
+    <div class="track-section">
+      <div class="section-label">Route Progress</div>
+      <div class="track-stops" id="trackStops">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Traffic Conditions -->
+    <div class="traffic-section">
+      <div class="section-label">Traffic Conditions</div>
+      <div class="traffic-btns">
+        <button class="traffic-btn active-smooth" id="t-smooth" onclick="setTraffic('smooth')">
+          <span class="t-icon">🟢</span>Smooth
+        </button>
+        <button class="traffic-btn" id="t-moderate" onclick="setTraffic('moderate')">
+          <span class="t-icon">🟡</span>Moderate
+        </button>
+        <button class="traffic-btn" id="t-heavy" onclick="setTraffic('heavy')">
+          <span class="t-icon">🔴</span>Heavy Jam
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="footer">
+    Simulated data &nbsp;·&nbsp; <span>Chennai Transit Authority</span> &nbsp;·&nbsp; v2.4.1
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ─────────────────────────────────────────────
+   DATA
+─────────────────────────────────────────────── */
+const ROUTES = {
+  bus: [
+    { id: 0, name: "21G — Broadway → Tambaram", stops: ["Broadway","Central","Guindy","Chrompet","Tambaram"], baseEta: 522, nextStop: "Central Station", vehicle: "Bus 21G · TN09 AM 4421" },
+    { id: 1, name: "5C — Broadway → K.K. Nagar", stops: ["Broadway","Park Town","T.Nagar","K.K.Nagar"], baseEta: 410, nextStop: "Park Town Bus Stop", vehicle: "Bus 5C · TN09 BK 7832" },
+    { id: 2, name: "M70 — CMBT → Sholinganallur", stops: ["CMBT","Guindy","Velachery","Sholinganallur"], baseEta: 680, nextStop: "Guindy TASMAC Jn", vehicle: "Bus M70 · TN09 CJ 1190" },
+    { id: 3, name: "11B — Central → Guindy", stops: ["Central","Egmore","T.Nagar","Guindy"], baseEta: 350, nextStop: "Egmore Bus Stop", vehicle: "Bus 11B · TN09 DL 3345" },
+    { id: 4, name: "47A — T.Nagar → Perambur", stops: ["T.Nagar","Vadapalani","Koyambedu","Perambur"], baseEta: 490, nextStop: "Vadapalani Signal", vehicle: "Bus 47A · TN09 ER 9023" },
+  ],
+  train: [
+    { id: 0, name: "EMU — Beach → Tambaram", stops: ["Beach","Park","Guindy","Chrompet","Tambaram"], baseEta: 312, nextStop: "Park Station", vehicle: "Train 56102 · 12 coaches" },
+    { id: 1, name: "Metro — Wimco → Airport", stops: ["Wimco","Washermanpet","Central","Airport"], baseEta: 228, nextStop: "Washermanpet Metro", vehicle: "Metro L1 · Blue Line" },
+    { id: 2, name: "EMU — Central → Avadi", stops: ["Central","Basin Br.","Ambattur","Avadi"], baseEta: 438, nextStop: "Basin Bridge Jn", vehicle: "Train 66011 · 8 coaches" },
+    { id: 3, name: "MRTS — Velachery → Beach", stops: ["Velachery","Guindy","Park","Beach"], baseEta: 270, nextStop: "Guindy MRTS", vehicle: "MRTS · 4 coaches" },
+    { id: 4, name: "Local — Tambaram → Beach", stops: ["Tambaram","Chrompet","Guindy","Beach"], baseEta: 380, nextStop: "Chrompet Station", vehicle: "Train 56104 · 12 coaches" },
+  ]
+};
+
+const TRAFFIC_MULTIPLIERS = { smooth: 1.0, moderate: 1.45, heavy: 2.1 };
+const TRAFFIC_DELAY_MSGS = {
+  smooth:   ["Running on schedule", "Clear roads ahead", "No delays reported"],
+  moderate: ["Moderate traffic on Anna Salai", "Slow near Kathipara Flyover", "Minor delay at T.Nagar signal"],
+  heavy:    ["Heavy jam at Kathipara Junction", "Standstill near Koyambedu bus stop", "Major congestion on GST Road"]
+};
+
+/* ─────────────────────────────────────────────
+   STATE
+─────────────────────────────────────────────── */
+let state = {
+  mode: 'bus',
+  routeIdx: 0,
+  traffic: 'smooth',
+  secondsLeft: 0,
+  timerInterval: null,
+  progress: 0.38,
+};
+
+/* ─────────────────────────────────────────────
+   INIT
+─────────────────────────────────────────────── */
+function getRoutes() { return ROUTES[state.mode]; }
+function currentRoute() { return getRoutes()[state.routeIdx]; }
+
+function init() {
+  rebuildRouteSelect();
+  resetRoute();
+}
+
+function rebuildRouteSelect() {
+  const sel = document.getElementById('routeSelect');
+  sel.innerHTML = '';
+  getRoutes().forEach((r, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = r.name;
+    sel.appendChild(opt);
+  });
+  sel.value = state.routeIdx;
+}
+
+function resetRoute() {
+  const r = currentRoute();
+  const mult = TRAFFIC_MULTIPLIERS[state.traffic];
+  state.secondsLeft = Math.round(r.baseEta * mult);
+  state.progress = 0.38 + Math.random() * 0.25;
+  renderETA();
+  renderTrack();
+  renderStatus();
+  renderSubtext();
+  startCountdown();
+}
+
+/* ─────────────────────────────────────────────
+   COUNTDOWN
+─────────────────────────────────────────────── */
+function startCountdown() {
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = setInterval(() => {
+    if (state.secondsLeft > 0) {
+      state.secondsLeft--;
+      renderETA();
+    } else {
+      clearInterval(state.timerInterval);
+      document.getElementById('etaSub').textContent = '🚌 Vehicle has arrived!';
+    }
+  }, 1000);
+}
+
+function renderETA() {
+  const m = Math.floor(state.secondsLeft / 60);
+  const s = state.secondsLeft % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  document.getElementById('etaValue').textContent = `${mm}:${ss}`;
+}
+
+/* ─────────────────────────────────────────────
+   STATUS
+─────────────────────────────────────────────── */
+function renderStatus() {
+  const pill = document.getElementById('statusPill');
+  const txt  = document.getElementById('statusText');
+  pill.className = 'status-pill';
+  if (state.traffic === 'smooth') {
+    pill.classList.add('on-time'); txt.textContent = 'On Time';
+  } else if (state.traffic === 'moderate') {
+    pill.classList.add('delayed'); txt.textContent = 'Slight Delay';
+  } else {
+    pill.classList.add('heavy'); txt.textContent = 'Heavily Delayed';
+  }
+}
+
+function renderSubtext() {
+  const msgs = TRAFFIC_DELAY_MSGS[state.traffic];
+  const r = currentRoute();
+  const msg = msgs[Math.floor(Math.random() * msgs.length)];
+  document.getElementById('etaSub').textContent =
+    state.traffic === 'smooth'
+      ? `Next stop: ${r.nextStop}`
+      : `⚠ ${msg}`;
+}
+
+/* ─────────────────────────────────────────────
+   TRACK
+─────────────────────────────────────────────── */
+function renderTrack() {
+  const r = currentRoute();
+  const stops = r.stops;
+  const progress = state.progress;
+
+  const container = document.getElementById('trackStops');
+  container.innerHTML = '';
+
+  const lineWrap = document.createElement('div');
+  lineWrap.className = 'track-line-wrap';
+  const lineFill = document.createElement('div');
+  lineFill.className = 'track-line-fill';
+  lineFill.style.width = '0%';
+  const vehicle = document.createElement('div');
+  vehicle.className = 'track-vehicle';
+  lineFill.appendChild(vehicle);
+  lineWrap.appendChild(lineFill);
+  container.appendChild(lineWrap);
+
+  stops.forEach((name, i) => {
+    const frac = i / (stops.length - 1);
+    const div = document.createElement('div');
+    div.className = 'stop';
+    if (frac < progress - 0.05) div.classList.add('passed');
+    else if (Math.abs(frac - progress) < 0.15) div.classList.add('current');
+
+    const dot = document.createElement('div');
+    dot.className = 'stop-dot';
+    const label = document.createElement('div');
+    label.className = 'stop-name';
+    label.textContent = name;
+    div.appendChild(dot);
+    div.appendChild(label);
+    container.appendChild(div);
+  });
+
+  requestAnimationFrame(() => {
+    lineFill.style.width = `${progress * 100}%`;
+  });
+}
+
+/* ─────────────────────────────────────────────
+   USER ACTIONS
+─────────────────────────────────────────────── */
+function setMode(m) {
+  state.mode = m;
+  state.routeIdx = 0;
+  document.getElementById('btn-bus').classList.toggle('active', m === 'bus');
+  document.getElementById('btn-train').classList.toggle('active', m === 'train');
+  rebuildRouteSelect();
+  resetRoute();
+}
+
+function onRouteChange() {
+  state.routeIdx = parseInt(document.getElementById('routeSelect').value, 10);
+  resetRoute();
+}
+
+function setTraffic(t) {
+  state.traffic = t;
+  ['smooth','moderate','heavy'].forEach(k => {
+    const btn = document.getElementById(`t-${k}`);
+    btn.className = 'traffic-btn' + (k === t ? ` active-${k}` : '');
+  });
+  const r = currentRoute();
+  const newSecs = Math.round(r.baseEta * TRAFFIC_MULTIPLIERS[t]);
+  animateETA(newSecs);
+  renderStatus();
+  renderSubtext();
+}
+
+function animateETA(target) {
+  const start = state.secondsLeft;
+  const delta = target - start;
+  const dur = 600;
+  const startTime = performance.now();
+
+  const el = document.getElementById('etaValue');
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+
+  if (state.timerInterval) clearInterval(state.timerInterval);
+
+  function step(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / dur, 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    state.secondsLeft = Math.round(start + delta * ease);
+    renderETA();
+    if (t < 1) requestAnimationFrame(step);
+    else startCountdown();
+  }
+  requestAnimationFrame(step);
+}
+
+function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  btn.addEventListener('animationend', () => btn.classList.remove('spinning'), { once: true });
+
+  const nudge = Math.floor(Math.random() * 31) - 15;
+  state.secondsLeft = Math.max(10, state.secondsLeft + nudge);
+  state.progress = Math.min(0.95, state.progress + 0.02);
+  renderETA();
+  renderTrack();
+  renderSubtext();
+
+  const el = document.getElementById('etaValue');
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+}
+
+/* ─────────────────────────────────────────────
+   BOOT
+─────────────────────────────────────────────── */
+init();
+</script>
+</body>
+</html>
