@@ -1,0 +1,24 @@
+{
+  "name": "abishek",
+  "version": "1.0.0",
+  "description": "\"# abishak\"",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abishek2604abi-cmd/abishak.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/abishek2604abi-cmd/abishak/issues"
+  },
+  "homepage": "https://github.com/abishek2604abi-cmd/abishak#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
